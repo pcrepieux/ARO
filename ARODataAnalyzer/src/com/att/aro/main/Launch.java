@@ -17,6 +17,7 @@
 
 package com.att.aro.main;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.SoftReference;
@@ -30,8 +31,10 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.jar.JarFile;
@@ -55,6 +58,22 @@ public class Launch {
 	private static final ResourceBundle rb = ResourceBundleManager
 			.getDefaultBundle();
 
+	private static Map parseArgs(String[] args){  
+	    Map<String,String> optsList = new HashMap<String,String>();
+	    for (int i=0; i < args.length; i++) {
+	        switch (args[i].charAt(0)) {
+	        case '-':
+	            if (args[i].length() < 2)
+	                throw new IllegalArgumentException("Not a valid argument: "+args[i]);
+                optsList.put(args[i], args[i+1]);
+                i++;
+	            break;
+	        default:
+	            break;
+	        };
+	    }
+	    return optsList;
+	}
 	/**
 	 * The starting point for the ARO Data Analyzer. This method launches the
 	 * application with the specified arguments.
@@ -63,7 +82,7 @@ public class Launch {
 	 *            Argument strings that are passed to the application at
 	 *            startup.
 	 */
-	public static void main(String[] args) {
+	public static void main(final String[] args) {
 		JarSignersHardLinker.go();
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
@@ -132,6 +151,11 @@ public class Launch {
 
 				}.execute();
 
+				Map<String,String> opt = parseArgs(args);
+				String directory = opt.get("-d");
+				if(null != directory && new File(directory).exists()){
+						mainClass.openTrace(new File(directory));
+				}
 			}
 		});
 	}
