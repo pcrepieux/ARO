@@ -22,8 +22,10 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.RawImage;
+import com.android.ddmlib.TimeoutException;
 
 /**
  * Represents a process thread for capturing raw images from the Android
@@ -118,6 +120,12 @@ public class VideoCaptureThread extends Thread {
 					allDone = true;
 				}
 				savedException = e;
+			} catch (TimeoutException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (AdbCommandRejectedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 		try {
