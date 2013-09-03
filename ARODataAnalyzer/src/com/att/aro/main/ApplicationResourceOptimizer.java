@@ -55,7 +55,6 @@ import javax.swing.Box;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -101,7 +100,7 @@ import com.att.aro.video.AROVideoPlayer;
 /**
  * Represents the main window of the ARO application.
  */
-public class ApplicationResourceOptimizer extends JFrame {
+public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger logger = Logger	.getLogger(ApplicationResourceOptimizer.class.getName());

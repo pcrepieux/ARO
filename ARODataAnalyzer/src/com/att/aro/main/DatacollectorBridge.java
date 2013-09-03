@@ -178,7 +178,7 @@ public class DatacollectorBridge {
 	 * ARO analyzer instance that is to be notified of data collector status
 	 * updates
 	 */
-	private ApplicationResourceOptimizer mAROAnalyzer;
+	private AROEnabledFrame mAROAnalyzer;
 
 	/**
 	 * Currently selected emulator device
@@ -235,7 +235,7 @@ public class DatacollectorBridge {
 	 *            The ApplicationResourceOptimizer parent application
 	 *            instance.
 	 */
-	public DatacollectorBridge(ApplicationResourceOptimizer mApp) {
+	public DatacollectorBridge(AROEnabledFrame mApp) {
 		super();
 		mAROAnalyzer = mApp;
 	}
