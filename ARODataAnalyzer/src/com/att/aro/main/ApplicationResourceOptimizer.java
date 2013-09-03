@@ -527,7 +527,7 @@ public class ApplicationResourceOptimizer extends JFrame {
 	 *            - The trace directory to open.
 	 * @throws IOException
 	 */
-	public synchronized void openTrace(File dir) throws IOException {
+	public synchronized void openTrace(File dir) {
 
 		traceFileName = dir;
 
