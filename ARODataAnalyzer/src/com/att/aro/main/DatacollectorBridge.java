@@ -151,7 +151,7 @@ public class DatacollectorBridge {
 	 */
 	private static final int WAIT_TO_START_COLLECTOR = 30;
 	
-	private static final int WAIT_FOR_EMULATOR_READY = 52000;
+	private static final int WAIT_FOR_EMULATOR_READY = 5000;
 	/**
 	 * Timer to stop data collector
 	 */
@@ -1042,6 +1042,7 @@ public class DatacollectorBridge {
 	 * @return Emulator device that can be used for data collector trace
 	 */
 	private IDevice checkAROEmulatorBridge() {
+		AndroidDebugBridge.init(false);
 		AndroidDebugBridge dataCollectorEmulatorbridge = AndroidDebugBridge.createBridge();
 
 		// Wait for ADB device list to fetch connected devices
