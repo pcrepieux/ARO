@@ -23,8 +23,10 @@ import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.RawImage;
+import com.android.ddmlib.TimeoutException;
 import com.att.aro.main.ResourceBundleManager;
 import com.att.aro.model.TraceData;
 
@@ -137,6 +139,10 @@ public class VideoCaptureThread extends Thread {
 					allDone = true;
 				}
 				savedException = e;
+			} catch (TimeoutException e) {
+				e.printStackTrace();
+			} catch (AdbCommandRejectedException e) {
+				e.printStackTrace();
 			}
 		}
 		try {

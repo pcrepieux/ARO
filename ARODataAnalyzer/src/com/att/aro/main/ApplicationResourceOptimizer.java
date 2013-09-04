@@ -54,7 +54,6 @@ import javax.swing.Box;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -114,7 +113,7 @@ import com.att.aro.video.AROVideoPlayer;
 /**
  * Represents the main window of the ARO application.
  */
-public class ApplicationResourceOptimizer extends JFrame {
+public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger LOGGER = Logger.getLogger(ApplicationResourceOptimizer.class.getName());
@@ -510,7 +509,7 @@ public class ApplicationResourceOptimizer extends JFrame {
 	 *            - The trace directory to open.
 	 * @throws IOException
 	 */
-	public synchronized void openTrace(File dir) throws IOException {
+	public synchronized void openTrace(File dir) {
 
 		traceFileName = dir;
 

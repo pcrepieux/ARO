@@ -25,4 +25,5 @@ goto run
 if "%_JAVA%" == "" set _JAVA=java.exe
 
 :run
-"%_JAVA%" -cp "%~dp0..\lib\*" -Xms100m -Xmx1024m com.att.aro.main.Launch
+"%_JAVA%" -cp "%~dp0..\lib\*" -Xms100m -Xmx1024m com.att.aro.main.Launch %*
+

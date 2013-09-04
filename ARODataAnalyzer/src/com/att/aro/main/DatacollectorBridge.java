@@ -39,12 +39,16 @@ import java.util.regex.Pattern;
 import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
 
+import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.AndroidDebugBridge;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IShellOutputReceiver;
+import com.android.ddmlib.InstallException;
 import com.android.ddmlib.MultiLineReceiver;
+import com.android.ddmlib.ShellCommandUnresponsiveException;
+import com.android.ddmlib.SyncException;
 import com.android.ddmlib.SyncService;
-import com.android.ddmlib.SyncService.SyncResult;
+import com.android.ddmlib.TimeoutException;
 import com.att.aro.commonui.AROProgressDialog;
 import com.att.aro.commonui.MessageDialogFactory;
 import com.att.aro.model.TraceData;
@@ -183,7 +187,7 @@ public class DatacollectorBridge {
 	 * ARO analyzer instance that is to be notified of data collector status
 	 * updates
 	 */
-	private ApplicationResourceOptimizer mAROAnalyzer;
+	private AROEnabledFrame mAROAnalyzer;
 
 	/**
 	 * Currently selected emulator device
@@ -248,7 +252,7 @@ public class DatacollectorBridge {
 	 *            The ApplicationResourceOptimizer parent application
 	 *            instance.
 	 */
-	public DatacollectorBridge(ApplicationResourceOptimizer mApp) {
+	public DatacollectorBridge(AROEnabledFrame mApp) {
 		super();
 		mAROAnalyzer = mApp;
 	}
@@ -387,10 +391,21 @@ public class DatacollectorBridge {
 				ShellOutputReceiver shelloutPut = new ShellOutputReceiver();
 				if (mAndroidDevice.isEmulator()) {
 					// Make sure the root ARO trace directory exists on SD CARD
-					mAndroidDevice.executeShellCommand("mkdir " + TRACE_ROOT,
-							new ShellOutputReceiver());
-					mAndroidDevice.executeShellCommand("mkdir "
-							+ deviceTracePath, shelloutPut);
+					try {
+						mAndroidDevice.executeShellCommand("mkdir " + TRACE_ROOT,
+								new ShellOutputReceiver());
+						mAndroidDevice.executeShellCommand("mkdir "
+								+ deviceTracePath, shelloutPut);
+					} catch (TimeoutException e) {
+						MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+								rb.getString("Error.mkdirfail"));
+					} catch (AdbCommandRejectedException e) {
+						MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+								rb.getString("Error.mkdirfail"));
+					} catch (ShellCommandUnresponsiveException e) {
+						MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+								rb.getString("Error.mkdirfail"));
+					}
 				
 					if (shelloutPut.shellError) {
 						MessageDialogFactory.showErrorDialog(mAROAnalyzer,
@@ -545,11 +560,22 @@ public class DatacollectorBridge {
 				ShellOutputReceiver shelloutPut = new ShellOutputReceiver();
 				if (mAndroidDevice.isEmulator()) {
 					// Make sure the root ARO trace directory exists on SD CARD
-					mAndroidDevice.executeShellCommand("mkdir " + TRACE_ROOT,
-							new ShellOutputReceiver());
-					mAndroidDevice.executeShellCommand("mkdir "
-							+ deviceTracePath, shelloutPut);
-				
+					try {
+						mAndroidDevice.executeShellCommand("mkdir " + TRACE_ROOT,
+								new ShellOutputReceiver());
+						mAndroidDevice.executeShellCommand("mkdir "
+								+ deviceTracePath, shelloutPut);
+					} catch (TimeoutException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (AdbCommandRejectedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (ShellCommandUnresponsiveException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
 					if (shelloutPut.shellError) {
 						CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.ErrorInPropFile"), rb.getString("Error.mkdirfail"));
 						CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.Status"), rb.getString("cmdline.status.failed"));
@@ -708,13 +734,14 @@ public class DatacollectorBridge {
 					 * Sending a 'ps tcpdump' command to the device to check the collector is actually stopped.
 					 * Checking the status of tcpdump with a one minute delay till tcpdump returns empty.
 					 * */
-					
+
 					try {
 						stopDataCollectoronDevice();
 					} catch (IOException e) {
 						logger.log(Level.WARNING,
 								"Unexpected IOException stopping tcpdump", e);
 					} 
+
 					// Stop video if necessary
 					if (mVideoCapture != null) {
 						mVideoCapture.stopRecording();
@@ -853,15 +880,25 @@ public class DatacollectorBridge {
 					
 					// Pull files from emulator/device one at a time
 					// Device and emulator has a separate list since most of the files are not present on the emulator
-					final SyncService service = mAndroidDevice.getSyncService();
+					SyncService service=null;
+					try {
+						service = mAndroidDevice.getSyncService();
+					} catch (TimeoutException e) {
+						return e.getMessage();
+					} catch (AdbCommandRejectedException e) {
+						return e.getMessage();
+					}
 					if (mAndroidDevice.isEmulator()){
 					if (service != null) {
 						for (String file : mDataEmulatorCollectortraceFileNames) {
-							SyncResult result = service.pullFile(deviceTracePath + "/" + file,
+							try{
+							service.pullFile(deviceTracePath + "/" + file,
 									new File(localTraceFolder, file).getAbsolutePath(),
 									SyncService.getNullProgressMonitor());
-							if (result.getCode() != SyncService.RESULT_OK) {
-								return result.getMessage();
+							}catch(SyncException e){
+								return e.getMessage();
+							} catch (TimeoutException e) {
+								return e.getMessage();
 							}
 						}						
 					}
@@ -869,25 +906,30 @@ public class DatacollectorBridge {
 					else{
 					if (service != null) {
 						for (String file : mDataDeviceCollectortraceFileNames) {
-							SyncResult result = service.pullFile(deviceTracePath + "/" + file,
+							try{
+								service.pullFile(deviceTracePath + "/" + file,
 									new File(localTraceFolder, file).getAbsolutePath(),
 									SyncService.getNullProgressMonitor());
-							if (result.getCode() != SyncService.RESULT_OK) {
-								return result.getMessage();
+							}catch(SyncException e){
+								return e.getMessage();
+							} catch (TimeoutException e) {
+								return e.getMessage();
 							}
 						}
 						//We do need to pull multiple pcap files if they are 
 						//available in trace directory (traffic1.cap,traffic2.cap ...)
 						for (int index = 1; index < 50; index++) {
 								final String fileName = "traffic" + index + ".cap";
-								SyncResult result = service.pullFile(
-										deviceTracePath + "/" + fileName,
-										new File(localTraceFolder, fileName)
-												.getAbsolutePath(), SyncService
-												.getNullProgressMonitor());
-								if (result.getCode() != SyncService.RESULT_OK) {
-									System.out.println(result.getMessage());
-									return result.getMessage();
+								try {
+									service.pullFile(
+											deviceTracePath + "/" + fileName,
+											new File(localTraceFolder, fileName)
+													.getAbsolutePath(), SyncService
+													.getNullProgressMonitor());
+								} catch (SyncException e) {
+									return e.getMessage();
+								} catch (TimeoutException e) {
+									return e.getMessage();
 								}
 							}
 					}
@@ -1045,7 +1087,21 @@ public class DatacollectorBridge {
 					rb.getString("Error.emulatorconnection"));
 			return null;
 		}
-		result.createForward(TCPDUMP_PORT, TCPDUMP_PORT);
+		try {
+			result.createForward(TCPDUMP_PORT, TCPDUMP_PORT);
+		} catch (TimeoutException e) {
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+					rb.getString("Error.emulatorconnection"));
+			return null;
+		} catch (AdbCommandRejectedException e) {
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+					rb.getString("Error.emulatorconnection"));
+			return null;
+		} catch (IOException e) {
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+					rb.getString("Error.emulatorconnection"));
+			return null;
+		}
 		return result;
 	}
 
@@ -1280,22 +1336,35 @@ public class DatacollectorBridge {
 
 			//check whether the collector is running on the device already.
 			String stopTcpCmd = rb.getString("Emulator.stopTCPDump");
-			mAndroidDevice.executeShellCommand(stopTcpCmd,
-					new IShellOutputReceiver() {
-			
-				public boolean isCancelled() {
-					return false;
-				}
+			try {
+				mAndroidDevice.executeShellCommand(stopTcpCmd,
+						new IShellOutputReceiver(){
 				
-				public void flush() {
+					public boolean isCancelled(){
+						return false;
+					}
 					
-				}
+					public void flush(){
+						
+					}
+					
+					//Taking the length of the stopTCPCommand to make sure it returns empty
+					public void addOutput(byte []data, int off, int len){
+						shellLineOutput = new String(data);
+						
+					}
 				
-				//Taking the length of the stopTCPCommand to make sure it returns empty
-				public void addOutput(byte []data, int off, int len) {
-					shellLineOutput = new String(data);					
-				}			
-			});
+				});
+			} catch (TimeoutException e3) {
+				MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+						rb.getString("Error.emulatorconnection"));
+			} catch (AdbCommandRejectedException e3) {
+				MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+						rb.getString("Error.emulatorconnection"));
+			} catch (ShellCommandUnresponsiveException e3) {
+				MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+						rb.getString("Error.emulatorconnection"));
+			}
 			
 			logger.log(Level.INFO,"Checking whether the collector is not running on the device");
 			if (isCollectorRunningInShell(shellLineOutput)) {
@@ -1319,25 +1388,42 @@ public class DatacollectorBridge {
 				return null;
 			}
 			
-			SyncService mService = mAndroidDevice.getSyncService();
+			SyncService mService;
+			try {
+				mService = mAndroidDevice.getSyncService();
+			} catch (TimeoutException e2) {
+				return rb.getString("Error.withtcpdumppush");
+			} catch (AdbCommandRejectedException e2) {
+				return rb.getString("Error.withtcpdumppush");
+			}
 			final String tcpdumpPath = rb
 					.getString("Emulator.datacollectorpath")
 					+ "/"
 					+ TCPDUMP;
-			SyncService.SyncResult keyDbpushResult = null;
+			boolean keyDbpushResult = false;
 			
 			if (mAndroidDevice.isEmulator()) {
 				// Copy tcpdump executable to emulator
 				File tcpdump = getAroCollectorFilesFromJar(TCPDUMP);
-				SyncService.SyncResult tcpdumpushResult = mService.pushFile(
+				try{
+				mService.pushFile(
 						tcpdump.getAbsolutePath(), tcpdumpPath,
 						SyncService.getNullProgressMonitor());
 				tcpdump.delete();
-				if (tcpdumpushResult.getCode() == SyncService.RESULT_OK) {
-					ShellOutputReceiver mShellOutput = new ShellOutputReceiver();
+				}catch(SyncException e){
+					return rb.getString("Error.withtcpdumppush");
+				} catch (TimeoutException e) {
+					return rb.getString("Error.withtcpdumppush");
+				}
+				ShellOutputReceiver mShellOutput = new ShellOutputReceiver();
+				try {
 					mAndroidDevice.executeShellCommand("chmod 777 "
-							+ tcpdumpPath, mShellOutput);
-				} else {
+								+ tcpdumpPath, mShellOutput);
+				} catch (TimeoutException e1) {
+					return rb.getString("Error.withtcpdumppush");
+				} catch (AdbCommandRejectedException e1) {
+					return rb.getString("Error.withtcpdumppush");
+				} catch (ShellCommandUnresponsiveException e1) {
 					return rb.getString("Error.withtcpdumppush");
 				}
 
@@ -1346,13 +1432,20 @@ public class DatacollectorBridge {
 				final String keydbPath = mAndroidDevice.isEmulator() ? rb
 						.getString("Emulator.datacollectorpath") + "/" + KEYDB
 						: deviceTracePath + "/" + KEYDB;
-				keyDbpushResult = mService.pushFile(keydb.getAbsolutePath(),
+				try{
+					mService.pushFile(keydb.getAbsolutePath(),
 						keydbPath, SyncService.getNullProgressMonitor());
-				keydb.delete();
+					keydb.delete();
+					keyDbpushResult=true;
+				}catch(SyncException e){
+					keyDbpushResult=false;
+				} catch (TimeoutException e) {
+					keyDbpushResult=false;
+				}
 			}
 			
 			if ((!mAndroidDevice.isEmulator()) || 
-					((keyDbpushResult != null) && (keyDbpushResult.getCode() == SyncService.RESULT_OK))) {
+					(keyDbpushResult)) {
 
 				// Start worker thread that will start data collector components
 				collectorSwingWorker = new SwingWorker<Object, Object>() {
@@ -1369,8 +1462,19 @@ public class DatacollectorBridge {
 									+ traceFolderName + " not port 5555";
 							ShellOutputReceiver tcpreceiver = new ShellOutputReceiver();
 							tcpdumpStartTime = System.currentTimeMillis();
-							mAndroidDevice.executeShellCommand(
-									strTcpDumpCommand, tcpreceiver);
+							try {
+								mAndroidDevice.executeShellCommand(
+										strTcpDumpCommand, tcpreceiver);
+							} catch (TimeoutException e) {
+								MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+										rb.getString("Error.emulatorconnection"));
+							} catch (AdbCommandRejectedException e) {
+								MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+										rb.getString("Error.emulatorconnection"));
+							} catch (ShellCommandUnresponsiveException e) {
+								MessageDialogFactory.showErrorDialog(mAROAnalyzer,
+										rb.getString("Error.emulatorconnection"));
+							}
 							logger.info("tcpdump stopped");
 						} else {
 							try {
@@ -1407,7 +1511,10 @@ public class DatacollectorBridge {
 									//TODO update to check socket for unexpected end of collector
 								}								
 							}
-							catch (InterruptedException e){}
+							catch (InterruptedException e){} 
+							catch (TimeoutException e) {}
+							catch (AdbCommandRejectedException e) {} 
+							catch (ShellCommandUnresponsiveException e) {}
 						}
 						
 						return null;
@@ -1533,10 +1640,23 @@ public class DatacollectorBridge {
 					//To close the collector activity on the device\emulator
 					ShellOutputReceiver shelloutPut = new ShellOutputReceiver();
 					String shellCmd = rb.getString("Emulator.closeactivity");
-					mAndroidDevice
-							.executeShellCommand(
-									shellCmd,
-									shelloutPut);
+
+					try {
+						mAndroidDevice
+								.executeShellCommand(
+										shellCmd,
+										shelloutPut);
+					} catch (TimeoutException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (AdbCommandRejectedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (ShellCommandUnresponsiveException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+
 					
 					if(!CommandLineHandler.getInstance().IsCommandLineEvent()) {
 						JOptionPane.showMessageDialog(mAROAnalyzer,
@@ -1642,25 +1762,40 @@ public class DatacollectorBridge {
 			checkSDCardSpace = null;
 		}
 		final String stopTcpCmd = rb.getString("Emulator.stopTCPDump");
+		
 		do {
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				logger.log(Level.SEVERE,"InterruptedException while sleep");
 			}
-			mAndroidDevice.executeShellCommand(stopTcpCmd,
-					new IShellOutputReceiver() {
-						public boolean isCancelled() {
-							return false;
-						}
-						public void flush() {
-						}
-						public void addOutput(
-								byte[] data, int off,
-								int len) {
-							shellLineOutput = new String(data);
-						}
-					});
+			
+			try {
+				mAndroidDevice
+				.executeShellCommand(stopTcpCmd,
+						new IShellOutputReceiver(){
+				
+				public boolean isCancelled(){
+					return false;
+				}
+				
+				public void flush(){
+					
+				}
+				
+				//Taking the output of the stopTCPCommand to make sure it returns empty
+				public void addOutput(byte []data, int off, int len){
+					shellLineOutput = new String(data);							
+				}
+				
+				});
+			} catch (TimeoutException e) {
+				logger.log(Level.WARNING,"Waiting for TCPDump to stop",e);
+			} catch (AdbCommandRejectedException e) {
+				logger.log(Level.WARNING,"Waiting for TCPDump to stop",e);
+			} catch (ShellCommandUnresponsiveException e) {
+				logger.log(Level.WARNING,"Waiting for TCPDump to stop",e);
+			}
 		
 		} while (shellLineOutput.contains("arodatacollector"));
 	}
@@ -1807,7 +1942,15 @@ public class DatacollectorBridge {
 		 * @throws IOException
 		 */
 		public ShellCommandCheckSDCardOutputReceiver(IDevice device) throws IOException {
-			device.executeShellCommand("df", this);
+			try {
+				device.executeShellCommand("df", this);
+			} catch (TimeoutException e) {
+				logger.log(Level.WARNING,"Unable to execute df",e);
+			} catch (AdbCommandRejectedException e) {
+				logger.log(Level.WARNING,"Unable to execute df",e);
+			} catch (ShellCommandUnresponsiveException e) {
+				logger.log(Level.WARNING,"Unable to execute df",e);
+			}
 		}
 
 		@Override
@@ -1878,7 +2021,7 @@ public class DatacollectorBridge {
 					emualatorSDCardAttached = true;
 					
 					String strFileSize = null;
-					String strValues[] = oneLine.split("\\emu+");
+					String strValues[] = oneLine.split("\\s+");
 					try {
 						if (oneLine.contains(rb.getString("Emulator.availablespace"))) {
 							strFileSize = strValues[5]; // 5th value in
@@ -1951,8 +2094,16 @@ public class DatacollectorBridge {
 	 */
 	private void removeEmulatorData() throws IOException {
 		ShellOutputReceiver shelloutPut = new ShellOutputReceiver();
-		mAndroidDevice.executeShellCommand("rm " + deviceTracePath + "/*", shelloutPut);
-		mAndroidDevice.executeShellCommand("rmdir " + deviceTracePath, shelloutPut);
+		try {
+			mAndroidDevice.executeShellCommand("rm " + deviceTracePath + "/*", shelloutPut);
+			mAndroidDevice.executeShellCommand("rmdir " + deviceTracePath, shelloutPut);
+		} catch (TimeoutException e) {
+			logger.log(Level.WARNING,"Unable to remove emulator data",e);
+		} catch (AdbCommandRejectedException e) {
+			logger.log(Level.WARNING,"Unable to remove emulator data",e);
+		} catch (ShellCommandUnresponsiveException e) {
+			logger.log(Level.WARNING,"Unable to remove emulator data",e);
+		}
 	}
 
 	/**
@@ -1969,7 +2120,15 @@ public class DatacollectorBridge {
 			}
 		}
 		localTraceFolder.delete();
-		mAndroidDevice.executeShellCommand("rm " + deviceTracePath + "/*", shelloutPut);
+		try {
+			mAndroidDevice.executeShellCommand("rm " + deviceTracePath + "/*", shelloutPut);
+		} catch (TimeoutException e) {
+			logger.log(Level.WARNING,"Unable to delete trace folder",e);
+		} catch (AdbCommandRejectedException e) {
+			logger.log(Level.WARNING,"Unable to delete trace folder",e);
+		} catch (ShellCommandUnresponsiveException e) {
+			logger.log(Level.WARNING,"Unable to delete trace folder",e);
+		}
 	}
 
 	/*
@@ -2033,6 +2192,26 @@ public class DatacollectorBridge {
 			String msg = rb.getString("Error.withemulatorioexecution");
 			MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.adbcollectorfail"));
 			logger.log(Level.SEVERE, msg, e);
+		} catch (SyncException e) {//thrown by Syncservice
+			String msg = rb.getString("Error.withemulatorioexecution");
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.adbcollectorfail"));
+			logger.log(Level.SEVERE, msg, e);
+		} catch (TimeoutException e) {//thrown by Syncservice, executeShellCommand
+			String msg = rb.getString("Error.withemulatorioexecution");
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.adbcollectorfail"));
+			logger.log(Level.SEVERE, msg, e);
+		} catch (AdbCommandRejectedException e) {//thrown by Syncservice, executeShellCommand
+			String msg = rb.getString("Error.withemulatorioexecution");
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.adbcollectorfail"));
+			logger.log(Level.SEVERE, msg, e);
+		} catch (InstallException e) {//thrown by installPackage
+			String msg = rb.getString("Error.withemulatorioexecution");
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.adbcollectorfail"));
+			logger.log(Level.SEVERE, msg, e);
+		} catch (ShellCommandUnresponsiveException e) {//thrown by executeShellCommand
+			String msg = rb.getString("Error.withemulatorioexecution");
+			MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.adbcollectorfail"));
+			logger.log(Level.SEVERE, msg, e);
 		}
 	}
 	
@@ -2041,23 +2220,30 @@ public class DatacollectorBridge {
 	 * */
 	private boolean isCollectorRunningOnDevice() throws IOException	{
 		String stopTcpCmd = rb.getString("Emulator.stopTCPDump");
-		mAndroidDevice.executeShellCommand(stopTcpCmd,
-			new IShellOutputReceiver(){
-			
-				public boolean isCancelled(){
-					return false;
-				}
+		try {
+			mAndroidDevice.executeShellCommand(stopTcpCmd,
+				new IShellOutputReceiver(){
 				
-				public void flush(){
+					public boolean isCancelled(){
+						return false;
+					}
 					
-				}
-				
-				//Taking the length of the stopTCPCommand to make sure it returns empty
-				public void addOutput(byte []data, int off, int len)		{
-					shellLineOutput = new String(data);
-				}
-			
-			});
+					public void flush(){
+						
+					}
+					
+					//Taking the length of the stopTCPCommand to make sure it returns empty
+					public void addOutput(byte []data, int off, int len)		{
+						shellLineOutput = new String(data);
+					}
+				});
+		} catch (TimeoutException e) {
+			logger.log(Level.WARNING,"unable to stop tcpdump",e);
+		} catch (AdbCommandRejectedException e) {
+			logger.log(Level.WARNING,"unable to stop tcpdump",e);
+		} catch (ShellCommandUnresponsiveException e) {
+			logger.log(Level.WARNING,"unable to stop tcpdump",e);
+		}
 		
 		logger.log(Level.INFO,"Checking whether the collector is running on the device");
 	
