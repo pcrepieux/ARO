@@ -16,7 +16,9 @@
 package com.att.android.arodatacollector.activities;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Display;
@@ -48,6 +50,8 @@ import com.att.android.arodatacollector.utils.AROLogger;
 
 public class AROCollectorSplashActivity extends Activity {
 
+	private static final String EULA_ACCEPTED = "eulaAccepted";
+
 	/** Log filter TAG string for ARO-Data Collector Splash Screen */
 	private static final String TAG = "ARO.SplashActivity";
 
@@ -62,6 +66,8 @@ public class AROCollectorSplashActivity extends Activity {
 
 	/** Request code from ARO legal screen page which is used in Splash Screen **/
 	private static final int TERMS_ACTIVITY = 1;
+
+	private static final String COLLECTOR_SETTINGS = "arodatacollector.settings";
 
 	/**
 	 * The handler is used to launch the Legal terms page from background thread
@@ -317,8 +323,14 @@ public class AROCollectorSplashActivity extends Activity {
 	 * Shows the Legal terms page to user
 	 */
 	private void acceptLegalTerms() {
-		startActivityForResult(new Intent(AROCollectorSplashActivity.this,
-				AROCollectorLegalTermsActivity.class), TERMS_ACTIVITY);
+		SharedPreferences settings = getSharedPreferences(COLLECTOR_SETTINGS, Context.MODE_PRIVATE);
+		boolean eulaAccepted = settings.getBoolean(EULA_ACCEPTED, false);
+		if(!eulaAccepted){
+			startActivityForResult(new Intent(AROCollectorSplashActivity.this,
+					AROCollectorLegalTermsActivity.class), TERMS_ACTIVITY);
+		}else{
+			startMainActivity();
+		}
 	}
 
 	/**
@@ -337,12 +349,15 @@ public class AROCollectorSplashActivity extends Activity {
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		if (requestCode == TERMS_ACTIVITY) {
+			SharedPreferences settings = getSharedPreferences(COLLECTOR_SETTINGS, Context.MODE_PRIVATE);
 			AROLogger.d(TAG, "inside onActivityResult, resultCode=" + resultCode);
 			if (resultCode == AROCollectorLegalTermsActivity.TERMS_ACCEPTED) {
 				AROLogger.d(TAG, "inside onActivityResult, starting main activity");
+				settings.edit().putBoolean(EULA_ACCEPTED, true).commit();
 				startMainActivity();
 			} else {
 				AROLogger.d(TAG, "inside onActivityResult, term not accepted, closing activity");
+				settings.edit().putBoolean(EULA_ACCEPTED, false).commit();
 				
 				/*if (resultCode == AROCollectorLegalTermsActivity.TERMS_REJECTED){
 					resetAnalyzerLaunchWaitingIndicator();
