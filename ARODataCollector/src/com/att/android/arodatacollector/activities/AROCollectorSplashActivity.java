@@ -15,12 +15,17 @@
  */
 package com.att.android.arodatacollector.activities;
 
+import java.io.File;
+import java.util.Timer;
+import java.util.TimerTask;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.view.Display;
 import android.view.MotionEvent;
 import android.view.Window;
@@ -35,6 +40,7 @@ import com.att.android.arodatacollector.main.AROCollectorCustomDialog.Dialog_Cal
 import com.att.android.arodatacollector.main.AROCollectorCustomDialog.Dialog_Type;
 import com.att.android.arodatacollector.main.AROCollectorCustomDialog.ReadyListener;
 import com.att.android.arodatacollector.main.AROCollectorService;
+import com.att.android.arodatacollector.main.AROCollectorTraceService;
 import com.att.android.arodatacollector.main.ARODataCollector;
 import com.att.android.arodatacollector.utils.AROCollectorUtils;
 import com.att.android.arodatacollector.utils.AROLogger;
@@ -49,8 +55,6 @@ import com.att.android.arodatacollector.utils.AROLogger;
  */
 
 public class AROCollectorSplashActivity extends Activity {
-
-	private static final String EULA_ACCEPTED = "eulaAccepted";
 
 	/** Log filter TAG string for ARO-Data Collector Splash Screen */
 	private static final String TAG = "ARO.SplashActivity";
@@ -67,7 +71,9 @@ public class AROCollectorSplashActivity extends Activity {
 	/** Request code from ARO legal screen page which is used in Splash Screen **/
 	private static final int TERMS_ACTIVITY = 1;
 
-	private static final String COLLECTOR_SETTINGS = "arodatacollector.settings";
+    /** Save in SharedPreference whether the user accepted EULA **/
+    private static final String COLLECTOR_SETTINGS = "arodatacollector.settings";
+    private static final String EULA_ACCEPTED = "eulaAccepted";
 
 	/**
 	 * The handler is used to launch the Legal terms page from background thread
@@ -98,9 +104,10 @@ public class AROCollectorSplashActivity extends Activity {
 
 	/** Boolean to check if the activity instance is in current memory **/
 	private boolean mActivityFinished = false;
-	
-	private String mAROTraceFolderNamefromAnalyzer;
 
+	private static final int ARO_LEGAL_AUTO_ACCEPT_TIME = 25000;
+	
+	private Timer aroDCStartWatchTimer = null;
 	/**
 	 * Overrides the onTouchEvent method to handle the ACTION DOWN event.
 	 * 
@@ -323,13 +330,45 @@ public class AROCollectorSplashActivity extends Activity {
 	 * Shows the Legal terms page to user
 	 */
 	private void acceptLegalTerms() {
-		SharedPreferences settings = getSharedPreferences(COLLECTOR_SETTINGS, Context.MODE_PRIVATE);
-		boolean eulaAccepted = settings.getBoolean(EULA_ACCEPTED, false);
-		if(!eulaAccepted){
-			startActivityForResult(new Intent(AROCollectorSplashActivity.this,
-					AROCollectorLegalTermsActivity.class), TERMS_ACTIVITY);
-		}else{
-			startMainActivity();
+        SharedPreferences settings = getSharedPreferences(COLLECTOR_SETTINGS, Context.MODE_PRIVATE);
+        boolean eulaAccepted = settings.getBoolean(EULA_ACCEPTED, false);
+        if(!eulaAccepted){
+            startActivityForResult(new Intent(AROCollectorSplashActivity.this,
+                    AROCollectorLegalTermsActivity.class), TERMS_ACTIVITY);
+        }else{
+            startMainActivity();
+        }
+		// TODO:Adding code to launch Data Collector from Analyzer
+		final Bundle apkCommandLineParameters = getIntent().getExtras();
+		if (apkCommandLineParameters != null) {
+			// sendAnalyzerLaunchBroadcast();
+			final String mAROTraceFolderNamefromAnalyzer = apkCommandLineParameters
+					.getString("TraceFolderName");
+			String mAROTraceStopDuration = apkCommandLineParameters
+					.getString("TraceStopDuration");
+			if (mAROTraceStopDuration == null) {
+				mAROTraceStopDuration = "0";
+			}
+			mApp.setTcpDumpTraceFolderName(mAROTraceFolderNamefromAnalyzer);
+			mApp.setTraceStopDuration(Integer.parseInt(mAROTraceStopDuration));
+		} else {
+			mApp.setTcpDumpTraceFolderName(null);
+			mApp.setTraceStopDuration(0);
+		}
+		if (mApp.getTraceStopDuration() > 0
+				&& mApp.getTcpDumpTraceFolderName() != null) {
+			mApp.setRQMCollectorLaunchfromAnalyzer(true);
+			aroDCStartWatchTimer = new Timer();
+			aroDCStartWatchTimer.schedule(new TimerTask() {
+				@Override
+				public void run() {
+					startMainActivity();
+					// Cancel the timers
+					aroDCStartWatchTimer.cancel();
+				}
+			}, ARO_LEGAL_AUTO_ACCEPT_TIME);
+		} else {
+			mApp.setRQMCollectorLaunchfromAnalyzer(false);
 		}
 	}
 
@@ -349,20 +388,24 @@ public class AROCollectorSplashActivity extends Activity {
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		if (requestCode == TERMS_ACTIVITY) {
-			SharedPreferences settings = getSharedPreferences(COLLECTOR_SETTINGS, Context.MODE_PRIVATE);
 			AROLogger.d(TAG, "inside onActivityResult, resultCode=" + resultCode);
+            SharedPreferences settings = getSharedPreferences(COLLECTOR_SETTINGS, Context.MODE_PRIVATE);
 			if (resultCode == AROCollectorLegalTermsActivity.TERMS_ACCEPTED) {
 				AROLogger.d(TAG, "inside onActivityResult, starting main activity");
-				settings.edit().putBoolean(EULA_ACCEPTED, true).commit();
+                settings.edit().putBoolean(EULA_ACCEPTED, true).commit();
 				startMainActivity();
+				
 			} else {
 				AROLogger.d(TAG, "inside onActivityResult, term not accepted, closing activity");
-				settings.edit().putBoolean(EULA_ACCEPTED, false).commit();
-				
+                settings.edit().putBoolean(EULA_ACCEPTED, false).commit();
 				/*if (resultCode == AROCollectorLegalTermsActivity.TERMS_REJECTED){
 					resetAnalyzerLaunchWaitingIndicator();
 				}*/
 				finish();
+			}
+			if (aroDCStartWatchTimer != null
+					&& mApp.isRQMCollectorLaunchfromAnalyzer()) {
+				aroDCStartWatchTimer.cancel();
 			}
 		}
 		super.onActivityResult(requestCode, resultCode, data);
@@ -376,17 +419,6 @@ public class AROCollectorSplashActivity extends Activity {
 	 * Start the data collector main screen after splash screens timesout
 	 */
 	private void startMainActivity() {
-		
-		//TODO:Adding code to launch Data Collector from Analyzer
-		final Bundle apkCommandLineParameters  = getIntent().getExtras();
-		if (apkCommandLineParameters != null) {
-			//sendAnalyzerLaunchBroadcast();
-			mAROTraceFolderNamefromAnalyzer = apkCommandLineParameters.getString("TraceFolderName");
-			mApp.setTcpDumpTraceFolderName(mAROTraceFolderNamefromAnalyzer);
-		}else{
-			mApp.setTcpDumpTraceFolderName(null);
-		}
-		
 		final Intent splashScreenIntent = new Intent(getBaseContext(),
 				AROCollectorMainActivity.class);
 		// Generic Error ID number 100 passed as an argument to navigate to Main

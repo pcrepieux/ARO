@@ -37,6 +37,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
@@ -53,7 +54,7 @@ public class Launch {
 	private static final ResourceBundle rb = ResourceBundleManager
 			.getDefaultBundle();
 
-	private static Map parseArgs(String[] args){  
+	private static Map parseArgs(final String[] args){
 	    Map<String,String> optsList = new HashMap<String,String>();
 	    for (int i=0; i < args.length; i++) {
 	        switch (args[i].charAt(0)) {
@@ -71,7 +72,6 @@ public class Launch {
 	}
 
 	private static final int indexOfTraceDirectoryName = 0;
-	private static final int indexOfTraceDurationInMins = 1;
 
 	/**
 	 * The starting point for the ARO Data Analyzer. This method launches the
@@ -82,11 +82,12 @@ public class Launch {
 	 *            startup.
 	 */
 	public static void main(final String[] args) {
-		
+		String title = rb.getString("aro.title.short");
+		System.setProperty("com.apple.mrj.application.apple.menu.about.name",title);
 		//Handle command line parameters
-		if (handleCommandLineParameters(args) == false) {
-			return;
-		}
+				if (handleCommandLineParameters(args) == false) {
+					return;
+				}
 
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
@@ -156,19 +157,26 @@ public class Launch {
 						if(CommandLineHandler.getInstance().IsCommandLineEvent() == true) {
 							ApplicationResourceOptimizer parent = CommandLineHandler.getInstance().getParent();
 							if (parent != null) {
-		        				DatacollectorBridge aroDataCollectorBridge = new DatacollectorBridge(parent);
-		        				aroDataCollectorBridge.startARODataCollector();
+								JOptionPane.showMessageDialog(parent,
+										rb.getString("cmdline.startupmsg"),
+										rb.getString("aro.title.short"),
+										JOptionPane.INFORMATION_MESSAGE);
 							}
 	        			}
 					}
 
 				}.execute();
 
+                //TODO sync with CommandLineHandler
 				Map<String,String> opt = parseArgs(args);
 				String directory = opt.get("-d");
 				if(null != directory && new File(directory).exists()){
-						mainClass.openTrace(new File(directory));
-				}
+                    try {
+                        mainClass.openTrace(new File(directory));
+                    } catch (IOException e) {
+                        logger.log(Level.SEVERE, "File not found", e);
+                    }
+                }
 			}
 		});		
 	}
@@ -193,23 +201,7 @@ public class Launch {
 		        	//Update trace directory name
 		        	CommandLineHandler.getInstance().InitializeTraceInfoFile();
 		        	CommandLineHandler.getInstance().setTraceDirectoryName(args[indexOfTraceDirectoryName]);
-		        			        	  
-		        	//Update trace duration
-        			try {
-        				double traceDurationInMins = Double.parseDouble(args[indexOfTraceDurationInMins]);
-        				CommandLineHandler.getInstance().setTraceDuration(traceDurationInMins);
-        				CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.traceDurationInPropFile"), Double.toString(traceDurationInMins * 60));
-        			} catch (NumberFormatException nfEx) {
-        				CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.ErrorInPropFile"), rb.getString("cmdline.invalidDuration"));
-        				CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.Status"), rb.getString("cmdline.status.failed"));
-        				return false;
-        			} catch (Exception ex) {
-        				CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.ErrorInPropFile"), rb.getString("cmdline.missingDuration"));
-        				CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.Status"), rb.getString("cmdline.status.failed"));
-        				return false;
-        			}
-	        		
-	        		CommandLineHandler.getInstance().SetCommandLineEvent(true);
+		        	CommandLineHandler.getInstance().SetCommandLineEvent(true);
 		        }		
 		    }
 		} catch (Exception Ex) {
