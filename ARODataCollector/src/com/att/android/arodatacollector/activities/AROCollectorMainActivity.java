@@ -181,6 +181,8 @@ public class AROCollectorMainActivity extends Activity {
 			
 		if (AROCollectorService.getServiceObj() != null) {
 			collectScreenVideo.setChecked(mApp.getCollectVideoOption());
+		}else{
+			collectScreenVideo.setChecked(false);
 		}
 		// Data Collector task killer button listener
 		taskKiller.setOnClickListener(new OnClickListener() {
