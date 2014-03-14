@@ -537,8 +537,12 @@ public class AROCollectorMainActivity extends Activity {
 			switch (msg.what) {
 			case NAVIGATE_HOME_SCREEN:
 				mApp.hideProgressDialog();
-				startActivity(new Intent(AROCollectorMainActivity.this,
-						AROCollectorHomeActivity.class));
+				Intent intent = new Intent(AROCollectorMainActivity.this,
+						AROCollectorHomeActivity.class);
+				if(mApp.isRQMCollectorLaunchfromAnalyzer()){
+					intent.putExtra("Quiet","true");
+				}
+				startActivity(intent);
 				finish();
 				break;
 			}

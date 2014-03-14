@@ -111,8 +111,9 @@ public class AROCollectorHomeActivity extends Activity {
 				 timerText.setText(getText(R.string.aro_traceTimer) + " " + asText); 
 			}         
 		});         
-		stopWatch.start(); 
-		
+		stopWatch.start();
+
+		registerAnalyzerCloseCmdReceiver();
 		final Bundle apkCommandLineParameters  = getIntent().getExtras();
 		if (apkCommandLineParameters != null) {
 			String mAROStopRequestFromAnalyzer = apkCommandLineParameters
@@ -120,9 +121,11 @@ public class AROCollectorHomeActivity extends Activity {
 			if(mAROStopRequestFromAnalyzer!=null){
 				stopARODataCollector();
 			}
+			String quiet = apkCommandLineParameters.getString("Quiet");
+			if(quiet!=null){
+				finish();
+			}
 		}
-		
-		registerAnalyzerCloseCmdReceiver();
 	}
 
 	/**

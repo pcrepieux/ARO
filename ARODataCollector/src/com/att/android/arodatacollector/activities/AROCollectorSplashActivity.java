@@ -317,6 +317,7 @@ public class AROCollectorSplashActivity extends Activity {
 					}
 					synchronized (mMutex) {
 						mInitialized = true;
+						mAbortSplash = true;
 						mMutex.notify();
 					}
 				}
