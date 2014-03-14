@@ -85,9 +85,10 @@ public class Launch {
 		String title = rb.getString("aro.title.short");
 		System.setProperty("com.apple.mrj.application.apple.menu.about.name",title);
 		//Handle command line parameters
-				if (handleCommandLineParameters(args) == false) {
-					return;
-				}
+		//TODO consider get it back
+		//if (handleCommandLineParameters(args) == false) {
+		//	return;
+		//}
 
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
