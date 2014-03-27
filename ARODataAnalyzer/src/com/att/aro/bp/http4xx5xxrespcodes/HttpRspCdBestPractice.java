@@ -41,7 +41,7 @@ import com.att.aro.util.Util;
  * @author ns5254
  * 
  */
-public abstract class HttpRspCdBestPractice implements BestPracticeDisplay {
+public abstract class HttpRspCdBestPractice extends BestPracticeDisplay {
 	private String rbPrefix;
 	private Http4xx5xxStatusResponseCodesResultPanel resultPanel;
 	
