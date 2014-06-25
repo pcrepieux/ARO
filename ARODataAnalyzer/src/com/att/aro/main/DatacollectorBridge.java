@@ -15,18 +15,15 @@
 
 package com.att.aro.main;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.text.MessageFormat;
-import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -111,8 +108,11 @@ public class DatacollectorBridge {
 			TraceData.PROP_FILE, TraceData.RADIO_EVENTS_FILE,
 			TraceData.SCREEN_STATE_FILE, TraceData.SCREEN_ROTATIONS_FILE,
 			TraceData.TIME_FILE, TraceData.USER_INPUT_LOG_EVENTS_FILE,
-			TraceData.VIDEO_TIME_FILE, TraceData.WIFI_FILE, TraceData.PCAP_FILE };
+			TraceData.ALARM_START_FILE, TraceData.ALARM_END_FILE,TraceData.BATTERYINFO_FILE,TraceData.KERNEL_LOG_FILE,
+			TraceData.VIDEO_TIME_FILE, TraceData.WIFI_FILE, TraceData.PCAP_FILE,TraceData.SSLKEY_FILE
+	};
 	
+
 	private static final String[] mDataEmulatorCollectortraceFileNames = { TraceData.CPU_FILE,
 		TraceData.APPID_FILE, TraceData.APPNAME_FILE, TraceData.TIME_FILE,
 		TraceData.USER_EVENTS_FILE, TraceData.PCAP_FILE,
@@ -1107,8 +1107,9 @@ public class DatacollectorBridge {
 			}
 			
 			if (CommandLineHandler.getInstance().IsCommandLineEvent()) {
-				if (progress != null)
+				if (progress != null) {
 					this.progress.dispose();
+				}
 			}
 			// SD card is ready
 			return true;
@@ -1345,6 +1346,7 @@ public class DatacollectorBridge {
 					CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.ErrorInPropFile"), rb.getString("Error.collectorisalreadyrunning"));
 					CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.Status"), rb.getString("cmdline.status.failed"));
 					MessageDialogFactory.showErrorDialog(mAROAnalyzer, rb.getString("Error.collectorisalreadyrunning"));
+					updateDataCollectorMenuItem(true, false);
 				}
 				setStatus(Status.READY);			
 				return null;
@@ -1492,12 +1494,14 @@ public class DatacollectorBridge {
 						// tcpdump has exited or device collector has been stopped.
 						// Make sure everything else is stopped
 						synchronized (DatacollectorBridge.this) {
-							if (isUsbDisconnectedFlag())
+							if (isUsbDisconnectedFlag()) {
 								return;
+							}
 							
 							setStatus(Status.STOPPING);
-							if (isAroNotOnTheDevice())
+							if (isAroNotOnTheDevice()) {
 								return;
+							}
 							
 							try {
 									// Check for exceptions
@@ -1568,8 +1572,9 @@ public class DatacollectorBridge {
 				}
 				synchronized (DatacollectorBridge.this) {
 					
-					if (isAroNotOnTheDevice())
+					if (isAroNotOnTheDevice()) {
 						return null;
+					}
 					
 					if (getStatus() != Status.STARTING) {
 						return rb.getString("Error.datacollectostart");
@@ -1645,8 +1650,11 @@ public class DatacollectorBridge {
 								JOptionPane.INFORMATION_MESSAGE);
 								setStatus(Status.READY);
 					} else {
+						setStatus(Status.READY);
+						updateDataCollectorMenuItem(true, false);
 						CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.ErrorInPropFile"), rb.getString("Error.collectortimeout"));
 						CommandLineHandler.getInstance().UpdateTraceInfoFile(rb.getString("cmdline.Status"), rb.getString("cmdline.status.failed"));
+						
 					}										
 				}
 				
@@ -2228,10 +2236,11 @@ public class DatacollectorBridge {
 		
 		logger.log(Level.INFO,"Checking whether the collector is running on the device");
 	
-		if  (isCollectorRunningInShell(shellLineOutput))
+		if  (isCollectorRunningInShell(shellLineOutput)) {
 			return true;
-		else 
-			return false;		
+		} else { 
+			return false;
+		}
 	}
 
 	/*Comparing with shellOuput to make sure arodatacollector running on device*/
