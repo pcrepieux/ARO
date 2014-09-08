@@ -46,6 +46,7 @@ import com.android.ddmlib.MultiLineReceiver;
 import com.android.ddmlib.ShellCommandUnresponsiveException;
 import com.android.ddmlib.SyncException;
 import com.android.ddmlib.SyncService;
+import com.att.aro.analytics.AnalyticFactory;
 import com.android.ddmlib.TimeoutException;
 import com.att.aro.commonui.AROProgressDialog;
 import com.att.aro.commonui.MessageDialogFactory;
@@ -150,7 +151,7 @@ public class DatacollectorBridge {
 	 */
 	private static final int WAIT_TO_START_COLLECTOR = 30;
 	
-	private static final int WAIT_FOR_EMULATOR_READY = 5000;
+	private static final int WAIT_FOR_EMULATOR_READY = 52000;
 	/**
 	 * Timer to stop data collector
 	 */
@@ -186,7 +187,7 @@ public class DatacollectorBridge {
 	 * ARO analyzer instance that is to be notified of data collector status
 	 * updates
 	 */
-	private AROEnabledFrame mAROAnalyzer;
+	private ApplicationResourceOptimizer mAROAnalyzer;
 
 	/**
 	 * Currently selected emulator device
@@ -251,7 +252,7 @@ public class DatacollectorBridge {
 	 *            The ApplicationResourceOptimizer parent application
 	 *            instance.
 	 */
-	public DatacollectorBridge(AROEnabledFrame mApp) {
+	public DatacollectorBridge(ApplicationResourceOptimizer mApp) {
 		super();
 		mAROAnalyzer = mApp;
 	}
@@ -365,7 +366,7 @@ public class DatacollectorBridge {
 							rb.getString("Error.sdcardfull"));
 					return;
 				}
-
+				AnalyticFactory.getGoogleAnalytics().sendAnalyticsEvents(rb.getString("ga.request.event.category.collector"), rb.getString("ga.request.event.collector.action.starttrace")); //end of GA Req
 				// Show progress dialog that indicates
 				setStatus(Status.STARTING);
 				localTraceFolder.mkdirs();
@@ -518,7 +519,7 @@ public class DatacollectorBridge {
 							rb.getString("Message.startcollectorOnDevice"));
 				}
 				progress.setVisible(true);
-
+				AnalyticFactory.getGoogleAnalytics().sendAnalyticsEvents(rb.getString("ga.request.event.category.collector"), rb.getString("ga.request.event.collector.action.starttrace"));  //end of GA Req
 				// Worker thread that starts collector
 				new SwingWorker<String, Object>() {
 
@@ -615,6 +616,9 @@ public class DatacollectorBridge {
 	 * instance that is associated with this class through the constructor.
 	 */
 	public synchronized void stopARODataCollector() {
+		//Calling Google Analytics
+		AnalyticFactory.getGoogleAnalytics().sendAnalyticsEvents(rb.getString("ga.request.event.category.collector"), rb.getString("ga.request.event.collector.action.endtrace"));  //end of GA Req	
+		
 		if (getStatus() == Status.STARTED) {
 			
 			if(CommandLineHandler.getInstance().IsCommandLineEvent() == true) {
@@ -650,14 +654,13 @@ public class DatacollectorBridge {
 					 * Sending a 'ps tcpdump' command to the device to check the collector is actually stopped.
 					 * Checking the status of tcpdump with a one minute delay till tcpdump returns empty.
 					 * */
-
+					
 					try {
 						stopDataCollectoronDevice();
 					} catch (IOException e) {
 						logger.log(Level.WARNING,
 								"Unexpected IOException stopping tcpdump", e);
 					} 
-
 					// Stop video if necessary
 					if (mVideoCapture != null) {
 						mVideoCapture.stopRecording();
@@ -1751,7 +1754,6 @@ public class DatacollectorBridge {
 			checkSDCardSpace = null;
 		}
 		final String stopTcpCmd = rb.getString("Emulator.stopTCPDump");
-		
 		do {
 			try {
 				Thread.sleep(1000);

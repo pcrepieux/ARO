@@ -39,7 +39,6 @@ import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +53,7 @@ import javax.swing.Box;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -73,6 +73,11 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.filechooser.FileFilter;
 
+import com.android.ddmlib.AdbCommandRejectedException;
+import com.android.ddmlib.IDevice;
+import com.android.ddmlib.ShellCommandUnresponsiveException;
+import com.android.ddmlib.TimeoutException;
+import com.att.aro.analytics.AnalyticFactory;
 import com.att.aro.bp.BestPracticeDisplayFactory;
 import com.att.aro.bp.asynccheck.AsyncCheckResultPanel;
 import com.att.aro.bp.displaynoneincss.DisplayNoneInCSSResultPanel;
@@ -88,6 +93,7 @@ import com.att.aro.commonui.MessageDialogFactory;
 import com.att.aro.datadump.DataDump;
 import com.att.aro.diagnostics.AROAdvancedTabb;
 import com.att.aro.images.Images;
+import com.att.aro.interfaces.Settings;
 import com.att.aro.main.menu.view.ChartPlotOptionsDialog;
 import com.att.aro.main.menu.view.ExcludeTimeRangeAnalysisDialog;
 import com.att.aro.main.menu.view.FilterApplicationsAndIpDialog;
@@ -103,7 +109,6 @@ import com.att.aro.model.Profile3G;
 import com.att.aro.model.ProfileException;
 import com.att.aro.model.ProfileLTE;
 import com.att.aro.model.ProfileType;
-import com.att.aro.interfaces.Settings;
 import com.att.aro.model.SettingsImpl;
 import com.att.aro.model.TimeRange;
 import com.att.aro.model.TraceData;
@@ -113,14 +118,15 @@ import com.att.aro.plugin.AnalyzerPlugin;
 import com.att.aro.plugin.MenuPlugin;
 import com.att.aro.plugin.ResultExportPlugin;
 import com.att.aro.ssl.SslKey;
+import com.att.aro.util.ShellReceiver;
 import com.att.aro.util.Util;
 import com.att.aro.video.AROVideoPlayer;
 
 /**
  * Represents the main window of the ARO application.
  */
-public class ApplicationResourceOptimizer extends AROEnabledFrame {
-
+public class ApplicationResourceOptimizer extends JFrame {
+	
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger LOGGER = Logger.getLogger(ApplicationResourceOptimizer.class.getName());
@@ -172,6 +178,7 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	private JMenuItem helpQuickGuideMenuItem;
 	private JMenuItem helpDependenciesMenuItem;
 	private JMenuItem helpSupportMenuItem;
+	private JMenuItem helpDownloadMenuItem;
 	private JMenuItem recordingIndicatorMenuItem;
 
 	private JToolTip recordingIndicatorToolTip;
@@ -199,7 +206,9 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	private JMenuItem stopDataCollectorMenuItem = null;
 
 	private DatacollectorBridge aroDataCollectorBridge; //for rooted-android device both windows and mac
-	private DatacollectorBridgeNoRoot aroDataCollectorBridgeNoRoot; //for non-rooted android on windows and mac
+//	private DatacollectorBridgeVPN aroDataCollectorBridgeVPN; //for non rooted-android device using VPN capture for both windows and mac
+	private DataCollectorNoRootVpn aroDataCollectorVPN; //for non rooted-android device using VPN capture for both windows and mac
+	private DatacollectorBridgeNoRoot aroDataCollectorBridgeNoRoot; //for non-rooted android on windows ONLY uses Virtual WIFI
 	private DataCollectorMacOS aroDataCollectorMacOS; //for Mac OS, of course iphone only
 
 	private Profile profile;
@@ -211,6 +220,11 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 		super();
 		ApplicationResourceOptimizer.aroFrame = this;
 		initialize();
+		
+		AnalyticFactory.loadLib();
+		AnalyticFactory.getGoogleAnalytics().applicationInfo(RB.getString("ga.trackid"), RB.getString("aro.title.short").trim(), ResourceBundleManager.getBuildBundle().getString("build.majorversion").trim());
+		AnalyticFactory.getGoogleAnalytics().sendAnalyticsEvents(RB.getString("ga.request.event.category.analyzer"), RB.getString("ga.request.event.analyzer.action.startapp"));
+		
 	}
 	
 	/**
@@ -525,7 +539,9 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	 *            - The trace directory to open.
 	 * @throws IOException
 	 */
-	public synchronized void openTrace(File dir) throws IOException{
+	public synchronized void openTrace(File dir) throws IOException {
+		
+		AnalyticFactory.getGoogleAnalytics().sendAnalyticsEvents(RB.getString("ga.request.event.category.analyzer"), RB.getString("ga.request.event.analyzer.action.load")); //GA Code
 
 		traceFileName = dir;
 
@@ -804,14 +820,15 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 		if (jHelpMenu == null) {
 			jHelpMenu = new JMenu(RB.getString("menu.help"));
 			jHelpMenu.setMnemonic(KeyEvent.VK_UNDEFINED);
-			jHelpMenu.add(getAboutMenuItem());
 			jHelpMenu.add(getFAQMenuItem());
-			jHelpMenu.add(getForumMenuItem());
 			jHelpMenu.add(getUserGuideMenuItem());
-			jHelpMenu.add(getLearnMoreMenuItem());
 			jHelpMenu.add(getQuickGuideMenuItem());
 			jHelpMenu.add(getHelpDependenciesMenuItem());
+			jHelpMenu.add(getForumMenuItem());
 			jHelpMenu.add(getHelpSupportMenuItem());
+			jHelpMenu.add(getHelpDownloadMenuItem());
+			jHelpMenu.add(getLearnMoreMenuItem());
+			jHelpMenu.add(getAboutMenuItem());
 		}
 		return jHelpMenu;
 	}
@@ -1008,6 +1025,28 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
         }
         return helpSupportMenuItem;
     }
+    
+    
+    /**
+     * Initializes and returns the Downloads menu item under the Help menu.
+    */
+    private JMenuItem getHelpDownloadMenuItem() {
+    	if (helpDownloadMenuItem == null) {
+    		helpDownloadMenuItem = new JMenuItem(RB.getString("menu.help.downloads"));
+    		helpDownloadMenuItem.addActionListener(new ActionListener() {
+    			
+    			@Override
+    			public void actionPerformed(ActionEvent arg0) {
+    				try {
+						BrowserGenerator.openBrowser(RB.getString("help.downloads.URL"));
+					} catch (IOException e) {
+						MessageDialogFactory.showUnexpectedExceptionDialog(ApplicationResourceOptimizer.this, e);
+					}
+    			}
+    		});
+    	}
+    	return helpDownloadMenuItem;
+    }
 	
 	
 	/**
@@ -1080,8 +1119,8 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 			startDataCollectorMenuItem.addActionListener(new ActionListener() {
 				@Override
 				public void actionPerformed(ActionEvent arg0) {
-					
-					if(CommandLineHandler.getInstance().IsCommandLineEvent() == false) {
+
+					if (CommandLineHandler.getInstance().IsCommandLineEvent() == false) {
 						startCollector();
 					} else {
 						if (aroDataCollectorBridge == null) {
@@ -1094,6 +1133,7 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 		}
 		return startDataCollectorMenuItem;
 	}
+	
 	private void startCollector(){
 		boolean isMac = Util.IsMacOS();
 		boolean isIOS = false;
@@ -1127,42 +1167,75 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 			return;
 		}
 		
-		
 		if(type == MobileDeviceType.IOS){
 			isIOS = true;
 		}
-		
+
 		
 		if(isMac && isIOS){
-			if(aroDataCollectorMacOS == null){
-				aroDataCollectorMacOS = new DataCollectorMacOS(ApplicationResourceOptimizer.this);
-			}
-			aroDataCollectorMacOS.startCollector();
+			startDataCollectorMacOS();
 		}else{
 			boolean isrootedAndroid = false;
+			boolean isEmulator = false;
 			try {
-				isrootedAndroid = device.isRootedAndroid();
+				isrootedAndroid = device.isAndroidRooted();
+				isEmulator = device.getFirstAndroidDevice().isEmulator();
 				LOGGER.info("Returned result of rooting: "+isrootedAndroid);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 			
-			if(isrootedAndroid){
-				if (aroDataCollectorBridge == null) {
-					aroDataCollectorBridge = new DatacollectorBridge(ApplicationResourceOptimizer.this);
+			boolean isApkInstalled = false;
+			if (isEmulator) {
+				startDataCollectorBridge();
+			} else if (isrootedAndroid && checkForApkOnRootedCollector(device.getFirstAndroidDevice())) {
+
+				LOGGER.info("Is datacollector package available : " + isApkInstalled);
+				LOGGER.info("Launching the rooted collector");
+				startDataCollectorBridge();
+
+			} else if (isrootedAndroid) {
+
+				if (isMac) {
+					Object[] options = { new String("Ok") };
+					String linkMessage = "<p>Please <a href=\"https://developer.att.com/application-resource-optimizer/get-aro/download\">download and install the ARO Collector</a> and restart your trace.</p>";
+					MessageDialogFactory.confirmCollectionMethod(options, null, linkMessage);
+				} else {
+					Object[] options = { new String("Ok"), new String("Cancel") };
+					String linkMessage = "<p>Choose OK to proceed with the ARO Wi-Fi Collector (Beta)<br>or<br><a href=\"https://developer.att.com/application-resource-optimizer/get-aro/download\">Download and install the ARO Collector</a>, choose CANCEL and restart your trace.</p>";
+					if (MessageDialogFactory.confirmCollectionMethod(options, null, linkMessage) == 0) {
+						startDataCollectorBridgeWifi();
+					}
 				}
-				aroDataCollectorBridge.startARODataCollector();
-			}else{
-                if(Util.isWindowsOS()){
-                    if(aroDataCollectorBridgeNoRoot == null){
-                        aroDataCollectorBridgeNoRoot = new DatacollectorBridgeNoRoot(ApplicationResourceOptimizer.this);
-                    }
-                    aroDataCollectorBridgeNoRoot.startCollector();
-                }else{
-                    MessageDialogFactory.showErrorDialog(mAROAnalyzer, "Currently non-rooted android collector is only supported by Windows.");
-                }
-			}
+			} else if(Util.isWindowsOS()){
+				// Windows virtual wifi
+                startDataCollectorBridgeWifi();
+            }else {
+            	//TODO update this message for a more appropriate message
+            	MessageDialogFactory.showErrorDialog(mAROAnalyzer, "Currently non-rooted android collector is only supported by Windows.");
+            }
 		}
+	}
+
+	private void startDataCollectorMacOS() {
+		if(aroDataCollectorMacOS == null){
+			aroDataCollectorMacOS = new DataCollectorMacOS(ApplicationResourceOptimizer.this);
+		}
+		aroDataCollectorMacOS.startCollector();
+	}
+
+	private void startDataCollectorBridgeWifi() {
+		if(aroDataCollectorBridgeNoRoot == null){
+		    aroDataCollectorBridgeNoRoot = new DatacollectorBridgeNoRoot(ApplicationResourceOptimizer.this);
+		}
+		aroDataCollectorBridgeNoRoot.startCollector();
+	}
+
+	private void startDataCollectorBridge() {
+		if (aroDataCollectorBridge == null) {
+			aroDataCollectorBridge = new DatacollectorBridge(ApplicationResourceOptimizer.this);
+		}
+		aroDataCollectorBridge.startARODataCollector();
 	}
 
 	/**
@@ -1181,6 +1254,13 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 					}
 					if(aroDataCollectorMacOS != null){
 						aroDataCollectorMacOS.stopCollector();
+					}
+					if(aroDataCollectorVPN != null){
+						try {
+							aroDataCollectorVPN.stopCollector();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
 					}
 					if(aroDataCollectorBridgeNoRoot != null){
 						try {
@@ -2044,18 +2124,6 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	private void runAnalysisFirstTime() throws IOException {
 		FilterProcessesDialog.initializeFilteredProcessSelection();
 		refresh(this.profile, null, null);
-
-		new SwingWorker<Object, Object>() {
-			@Override
-			protected Boolean doInBackground()
-					throws IOException {
-				//touch usage
-				 return updateUsage();
-			}
-			
-			@Override
-			protected void done() {};
-		}.execute();
 		
 	}
 
@@ -2207,6 +2275,8 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 	 *            The trace analysis data.
 	 * @param profile
 	 *            The selected profile.
+	 * @param selections
+	 *            The collection of selected application/IPs.
 	 * 
 	 */
 	private synchronized void displayAnalysis(TraceData.Analysis analysis, Profile profile, AnalysisFilter filter, String msg) throws IOException {
@@ -2419,38 +2489,17 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 		return this.getChartPlotOptionsDialog().isCpuCheckBoxSelected();
 	}
 
-	/**
-	 * Touch usage for analytics
-	 */
-	private Boolean updateUsage() {
-		Boolean result = Boolean.FALSE;
-		try {
-			ResourceBundle buildBundle = ResourceBundleManager.getBuildBundle();
-			boolean useOpenUrl = Boolean.parseBoolean(RB.getString("aro.open"));
-			if (useOpenUrl) {
-				String urlBase = RB.getString("aro.open.urlbase");
-				String majorVersion = buildBundle
-						.getString("build.majorversion");
-				StringBuilder fullUrl = new StringBuilder();
-				fullUrl.append(urlBase).append("?v=")
-						.append(majorVersion);
-				String osName = System.getProperty("os.name");
-				fullUrl.append("&o=").append(osName.replace(' ', '_'));
-				fullUrl.append("&a=").append(System.getProperty("os.arch"));
-				Util.fetchFile(new URL(fullUrl.toString()));
-				
-				result = Boolean.TRUE;
-			}
-		} catch (Exception e) {
-			//do nothing, catch any exception to allow app to continue
-		}
-		
-		return result;
-	}
+	
 	/**
 	 * stop background tasks and clean up all resources
 	 */
 	public void Dispose(){
+		
+		
+		//Set gaFocusPoint
+	    AnalyticFactory.getGoogleAnalytics().sendAnalyticsEvents(RB.getString("ga.request.event.category.analyzer"), RB.getString("ga.request.event.analyzer.action.endapp"));
+       
+		
 		//for user friendly experience, there should be a progress box while cleaning up resource
 		//which take a few seconds
 		final AROProgressDialog box = new AROProgressDialog(ApplicationResourceOptimizer.this, "Please wait...");
@@ -2464,4 +2513,38 @@ public class ApplicationResourceOptimizer extends AROEnabledFrame {
 		LOGGER.info("Finished Dispose()");
 		box.setVisible(false);
 	}
+	
+	/**
+	 * Checking rooted android devices has ARO installed or not.
+	 * @param androidDevice
+	 * @return
+	 */
+	public boolean checkForApkOnRootedCollector(IDevice androidDevice){
+		LOGGER.info("Checking for APK");
+		ShellReceiver shelloutPut = new ShellReceiver(RB.getString("Device.arodatacollectorpkg"));
+		String shellCmd = RB.getString("Device.apkcommand");
+		try {
+			androidDevice.executeShellCommand(shellCmd, shelloutPut);
+			LOGGER.info("result :" + shelloutPut.getResponseString());
+		} catch (IOException e) {
+			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
+			e.printStackTrace();
+		} catch (TimeoutException e) {
+			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
+			e.printStackTrace();
+		} catch (AdbCommandRejectedException e) {
+			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
+			e.printStackTrace();
+		} catch (ShellCommandUnresponsiveException e) {
+			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
+			e.printStackTrace();
+		}
+
+		return (shelloutPut.getResponseString() != null);
+	}
+
+    public ResourceBundle getRb() {
+        return RB;
+    }
+
 }
