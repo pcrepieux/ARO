@@ -31,11 +31,9 @@ import java.util.logging.SimpleFormatter;
 import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
 
-import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice;
-import com.android.ddmlib.SyncException;
 import com.android.ddmlib.SyncService;
-import com.android.ddmlib.TimeoutException;
+import com.android.ddmlib.SyncService.SyncResult;
 import com.att.aro.analytics.AnalyticFactory;
 import com.att.aro.commonui.DataCollectorFolderDialog;
 import com.att.aro.commonui.MessageDialogFactory;
@@ -406,30 +404,26 @@ public class DataCollectorNoRootVpn implements ImageSubscriber {
 	private String pullTaceData(VPNPacketCapture vpnPacketCapture) {
 		String rez = null;
 		try {
-			SyncService service = null;
-			try {
-				service = vpnPacketCapture.getAndroidDevice().getSyncService();
-			} catch (TimeoutException e) {
-				e.printStackTrace();
-			} catch (AdbCommandRejectedException e) {
-				e.printStackTrace();
-			}
+			SyncService service = vpnPacketCapture.getAndroidDevice().getSyncService();
 			String srcFile = null;
 			String dstFile = null;
+			SyncResult result = null;
 			for (String file : mDataDeviceCollectorTraceFileNames) {
 				srcFile = "/sdcard/ARO" + "/" + file;
 				dstFile = new File(localTraceFolder, file).getAbsolutePath();
 
-				try {
-					service.pullFile(srcFile, dstFile, SyncService.getNullProgressMonitor());
+				result = service.pullFile(srcFile, dstFile, SyncService.getNullProgressMonitor());
+
+				logger.info(result.getCode() + " : " + srcFile);
+
+				if (result.getCode() == SyncService.RESULT_OK) {
 					System.out.println("Copied :" + srcFile);
-				} catch (TimeoutException e) {
-					System.out.println("Failed :" + srcFile);
-				} catch (SyncException e) {
+				}else{
+					service.close();
+					service = vpnPacketCapture.getAndroidDevice().getSyncService();
 					System.out.println("Failed :" + srcFile);
 				}
 			}
-			service.close();
 		} catch (IOException e) {
 			rez = "Error :" + e.getMessage();
 			e.printStackTrace();

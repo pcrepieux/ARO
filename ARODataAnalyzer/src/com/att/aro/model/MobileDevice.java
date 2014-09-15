@@ -19,10 +19,10 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
-import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.android.ddmlib.*;
+import com.android.ddmlib.AndroidDebugBridge;
+import com.android.ddmlib.IDevice;
+import com.android.ddmlib.IShellOutputReceiver;
 import com.att.aro.util.Util;
 
 public class MobileDevice {
@@ -80,15 +80,8 @@ public class MobileDevice {
 			
 			ShellOutputReceiver receiver = new ShellOutputReceiver();
 			logger.info("executing su command on device");
-            try {
-                device.executeShellCommand("su", receiver);
-            } catch (TimeoutException e) {
-                logger.log(Level.SEVERE, "timeout while executing: su", e);
-            } catch (AdbCommandRejectedException e) {
-                logger.log(Level.SEVERE, "command rejected : su", e);
-            } catch (ShellCommandUnresponsiveException e) {
-                logger.log(Level.SEVERE, "unresponsive command: su", e);;
-            }
+            device.executeShellCommand("su", receiver);
+
             return receiver.isRoot();
 		}
 		return false;
@@ -109,15 +102,7 @@ public class MobileDevice {
 			
 			ShellOutputReceiver receiverSU = new ShellOutputReceiver();
 			logger.info("executing su command on device");
-			try {
-				device.executeShellCommand("su -c id", receiverSU);
-			} catch (TimeoutException e) {
-				logger.warning("timeout executing su command on device");
-			} catch (AdbCommandRejectedException e) {
-				logger.warning("rejected executing su command on device");
-			} catch (ShellCommandUnresponsiveException e) {
-				logger.warning("no response executing su command on device");
-			}
+			device.executeShellCommand("su -c id", receiverSU);
 
 			// uid=2000(shell) gid=2000(shell) groups=1003(graphics),1004(input),1007(log),1011(adb),1015(sdcard_rw),1028(sdcard_r),3001(net_bt_admin),3002(net_bt),3003(inet),3006(net_bw_stats) context=u:r:shell:s0
 			// uid=0(root) gid=0(root) context=u:r:shell:s0

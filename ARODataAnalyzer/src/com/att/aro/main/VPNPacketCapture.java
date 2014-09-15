@@ -10,11 +10,7 @@ import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice;
-import com.android.ddmlib.InstallException;
-import com.android.ddmlib.ShellCommandUnresponsiveException;
-import com.android.ddmlib.TimeoutException;
 import com.att.aro.util.ApkUtil;
 import com.att.aro.util.ShellReceiver;
 import com.att.aro.util.Util;
@@ -53,14 +49,17 @@ public class VPNPacketCapture extends Thread{
 			e.printStackTrace();
 		}
 		// Installs application version collection apk in emulator.
-		//TODO: find a better to detect old version and uninstall it.
 		try {
+		    //TODO: find a better to detect old version and uninstall it.
 			androidDevice.uninstallPackage(rb.getString("Emulator.vpnPackageName"));
 			androidDevice.installPackage(collectorVpnApk.getPath(), true);
-		} catch (InstallException e) {
+			adbConnection = true;
+		} catch (IOException e) {
+			logger.severe("Failed to install APK to device"+e.getMessage());
+			adbConnection = false;
+			//26:21 E/Device: Unable to open sync connection! reason: Unable to upload file: timeout
 			e.printStackTrace();
 		}
-		adbConnection = true;
 
 		// make sure collector is not running
 		forceStopAPK();
@@ -74,12 +73,7 @@ public class VPNPacketCapture extends Thread{
 			collectorVpnApk.delete();
 		} catch (IOException e) {
 			logger.severe("Failed to launch collector on device"+e.getMessage());
-		} catch (TimeoutException e) {
-			logger.severe("Failed to launch collector on device" + e.getMessage());
-		} catch (AdbCommandRejectedException e) {
-			logger.severe("Failed to launch collector on device" + e.getMessage());
-		} catch (ShellCommandUnresponsiveException e) {
-			logger.severe("Failed to launch collector on device" + e.getMessage());
+			e.printStackTrace();
 		}
 	}
 
@@ -104,12 +98,6 @@ public class VPNPacketCapture extends Thread{
 			} else {
 				e.printStackTrace();
 			}
-		} catch (TimeoutException e) {
-			logger.severe("Failed to uninstall apk, error:" + e.getMessage());
-		} catch (AdbCommandRejectedException e) {
-			logger.severe("Failed to uninstall apk, error:" + e.getMessage());
-		} catch (ShellCommandUnresponsiveException e) {
-			logger.severe("Failed to uninstall apk, error:" + e.getMessage());
 		}
 
 		return (shelloutPut.getResponseString() != null);
@@ -135,12 +123,6 @@ public class VPNPacketCapture extends Thread{
 			} else {
 				e.printStackTrace();
 			}
-		} catch (TimeoutException e) {
-			logger.severe("Failed to query device for tun0, error:" + e.getMessage());
-		} catch (AdbCommandRejectedException e) {
-			logger.severe("Failed to query device for tun0, error:" + e.getMessage());
-		} catch (ShellCommandUnresponsiveException e) {
-			logger.severe("Failed to query device for tun0, error:" + e.getMessage());
 		}
 
 		return (shelloutPut.getResponseString() != null);
@@ -160,12 +142,6 @@ public class VPNPacketCapture extends Thread{
 		} catch (IOException e) {
 			logger.severe("Failed to go home"+e.getMessage());
 			e.printStackTrace();
-		} catch (TimeoutException e) {
-			logger.severe("Failed to go home"+e.getMessage());
-		} catch (AdbCommandRejectedException e) {
-			logger.severe("Failed to go home"+e.getMessage());
-		} catch (ShellCommandUnresponsiveException e) {
-			logger.severe("Failed to go home"+e.getMessage());
 		}
 	}
 
@@ -193,19 +169,23 @@ public class VPNPacketCapture extends Thread{
 		
 		// Verifiy Collector apk is running
 		ShellReceiver shellOutput = new ShellReceiver("com.att.arocollector");
-		String command = "ps";
-
+		String shellCmd = "ps";
 		try {
-			androidDevice.executeShellCommand(command, shellOutput);
+			androidDevice.executeShellCommand(shellCmd, shellOutput);
 			String resp = shellOutput.getResponseString();
 			// Samsung S4 9ea10795		{u0_a219   20091 208   885372 32376 ffffffff 00000000 S com.att.arocollector}
 			// LG						{app_130   11964 183   496392 53008 ffffffff 00000000 S com.att.arocollector}
 			// Samsung S4 1589d5f2		{u0_a196   4077  213   874280 46264 ffffffff 00000000 S com.att.arocollector}
 			// Nexus 5 05ad2440f0dc050b	{u0_a109   12132 180   898832 39648 ffffffff 00000000 S com.att.arocollector}
 			logger.info("result :"+resp);
+		} catch (IOException e) {
+			logger.severe("Failed to executeShellCommand, error:"+e.getMessage());
+			e.printStackTrace();
+		}
 
+		try {
 			// message CaptureVpnService to terminate VPN capture
-			command = rb.getString("Emulator.closeVpnService"); // am broadcast -a arovpndatacollector.service.close
+			String command = rb.getString("Emulator.closeVpnService"); // am broadcast -a arovpndatacollector.service.close
 			shellOutput.setCompareText("Broadcast completed:");
 			androidDevice.executeShellCommand(command, shellOutput);
 			logger.log(Level.INFO, "broadcast to close vpn service sent");
@@ -215,16 +195,7 @@ public class VPNPacketCapture extends Thread{
 			androidDevice.executeShellCommand(command, shellOutput);
 			logger.log(Level.INFO, "broadcast to close home activity sent");
 		} catch (IOException e) {
-			logger.severe("Failed to execute "+command+", error:"+e.getMessage());
-			e.printStackTrace();
-		} catch (AdbCommandRejectedException e) {
-			logger.severe("Failed to execute "+command+", error:"+e.getMessage());
-			e.printStackTrace();
-		} catch (ShellCommandUnresponsiveException e) {
-			logger.severe("Failed to execute "+command+", error:"+e.getMessage());
-			e.printStackTrace();
-		} catch (TimeoutException e) {
-			logger.severe("Failed to execute "+command+", error:"+e.getMessage());
+			logger.severe("Failed to executeShellCommand, error:"+e.getMessage());
 			e.printStackTrace();
 		}
 
@@ -241,13 +212,7 @@ public class VPNPacketCapture extends Thread{
 			try {
 				androidDevice.executeShellCommand(command, shellOutput);
 			} catch (IOException e) {
-				logger.info(command+" failed:" + e.getMessage());
-			} catch (TimeoutException e) {
-				logger.info(command+" failed:" + e.getMessage());
-			} catch (AdbCommandRejectedException e) {
-				logger.info(command+" failed:" + e.getMessage());
-			} catch (ShellCommandUnresponsiveException e) {
-				logger.info(command+" failed:" + e.getMessage());
+				logger.info("IOException:" + e.getMessage());
 			}
 			String[] responseList = shellOutput.getResponseStrings();
 			if (responseList != null) {
@@ -273,12 +238,6 @@ public class VPNPacketCapture extends Thread{
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} catch (TimeoutException e) {
-			logger.info("IOException:" + e.getMessage());
-		} catch (AdbCommandRejectedException e) {
-			logger.info("IOException:" + e.getMessage());
-		} catch (ShellCommandUnresponsiveException e) {
-			logger.info("IOException:" + e.getMessage());
 		}
 	}
 

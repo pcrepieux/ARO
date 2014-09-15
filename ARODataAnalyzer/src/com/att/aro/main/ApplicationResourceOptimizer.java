@@ -73,10 +73,7 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.filechooser.FileFilter;
 
-import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IDevice;
-import com.android.ddmlib.ShellCommandUnresponsiveException;
-import com.android.ddmlib.TimeoutException;
 import com.att.aro.analytics.AnalyticFactory;
 import com.att.aro.bp.BestPracticeDisplayFactory;
 import com.att.aro.bp.asynccheck.AsyncCheckResultPanel;
@@ -2527,15 +2524,6 @@ public class ApplicationResourceOptimizer extends JFrame {
 			androidDevice.executeShellCommand(shellCmd, shelloutPut);
 			LOGGER.info("result :" + shelloutPut.getResponseString());
 		} catch (IOException e) {
-			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
-			e.printStackTrace();
-		} catch (TimeoutException e) {
-			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
-			e.printStackTrace();
-		} catch (AdbCommandRejectedException e) {
-			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
-			e.printStackTrace();
-		} catch (ShellCommandUnresponsiveException e) {
 			LOGGER.severe("Failed to query device for tun0, error:" + e.getMessage());
 			e.printStackTrace();
 		}
