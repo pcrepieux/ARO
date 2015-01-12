@@ -2,8 +2,8 @@
 !include "MUI2.nsh"
 
 !define PRODUCT_NAME "ARO"
-!define VERSION_MAJOR 3
-!define VERSION_MINOR 2
+!define VERSION_MAJOR 4
+!define VERSION_MINOR 0
 !define PRODUCT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}"
 !define COMPANY_NAME "AT&T"
 !define DESCRIPTION "Application Resource Optimizer"
