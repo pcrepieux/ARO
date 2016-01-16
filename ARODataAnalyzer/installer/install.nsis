@@ -3,8 +3,9 @@
 
 !define PRODUCT_NAME "ARO"
 !define VERSION_MAJOR 4
-!define VERSION_MINOR 0
-!define PRODUCT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}"
+!define VERSION_MINOR 1
+!define VERSION_FIX 1
+!define PRODUCT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_FIX}"
 !define COMPANY_NAME "AT&T"
 !define DESCRIPTION "Application Resource Optimizer"
 !define HELP_URL "http://developer.att.com/ARO"
@@ -19,7 +20,7 @@ SetCompressor lzma
 # required to properly delete startup menu links on uninstall
 RequestExecutionLevel user
 
-VIProductVersion ${VERSION_MAJOR}.${VERSION_MINOR}.0.0
+VIProductVersion ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_FIX}.0
 VIAddVersionKey ProductName ${PRODUCT_NAME}
 VIAddVersionKey ProductVersion "${PRODUCT_VERSION}"
 VIAddVersionKey FileVersion "${PRODUCT_VERSION}"
@@ -116,7 +117,7 @@ InstallARO:
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "Publisher" "${COMPANY_NAME}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "HelpLink" "${HELP_URL}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "URLInfoAbout" "${ABOUT_URL}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "DisplayVersion" "${VERSION_MAJOR}.${VERSION_MINOR}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "DisplayVersion" "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_FIX}"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "VersionMajor" ${VERSION_MAJOR}
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANY_NAME} ${PRODUCT_NAME}" "VersionMinor" ${VERSION_MINOR}
     # There is no option for modifying or repairing the install
